@@ -3,12 +3,15 @@ package com.codlab.hellothreadjava;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 
+import android.annotation.SuppressLint;
+import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Message;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
+import android.widget.ProgressBar;
 
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -17,9 +20,10 @@ import java.util.concurrent.TimeUnit;
 
 public class MainActivity extends AppCompatActivity {
     Button btn;
-
+    private ProgressBar pb;
+    private int progress;
+    @SuppressLint("HandlerLeak")
     private Handler handler = new Handler() {
-        //接收消息等待處理
         @Override
         public void handleMessage(@NonNull Message msg) {
         switch (msg.what) {
@@ -27,10 +31,15 @@ public class MainActivity extends AppCompatActivity {
                 btn.setText("123456789");
                 break;
             case 2:
-                btn.setText("23456");
+                String string = (String) msg.obj;
+                btn.setText(string);
                 break;
             case 3:
-                btn.setText("6543");
+                if (progress < 100) {
+                    progress += 10;
+                    pb.setProgress(progress);
+                    handler.sendEmptyMessageDelayed(3, 2* 1000);
+                }
                 break;
         }
         }
@@ -41,9 +50,157 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
 
         btn =(Button) findViewById(R.id.btn);
+        pb = (ProgressBar) findViewById(R.id.pb);
     }
     public void btnOnClick(View view) {
-        aSyncThread();
+//        aSyncThread();
+//    testTimer();
+//        testPost();
+    new TryAsync().execute();
+
+    }
+
+    class TryAsync extends AsyncTask<Void,Integer,Boolean> {
+    int progress;
+
+        @Override
+        protected void onPreExecute() {
+            super.onPreExecute();
+            Log.d("TAG", "準備下載");
+            pb.setVisibility(View.VISIBLE);
+        }
+        @Override
+        protected Boolean doInBackground(Void... voids) {
+
+            Log.d("TAG", "正在下載");
+
+            try {
+                while (true) {
+                 //每隔1秒下載10%
+                        Thread.sleep(1000);
+                        progress+=10;
+                        publishProgress(progress);
+                    if (progress >= 100) {
+                        break;
+                    }
+                }
+            }catch (Exception e) {
+                return false;
+            }
+
+            return true;
+        }
+
+        @Override
+        protected void onProgressUpdate(Integer... values) {
+            super.onProgressUpdate(values);
+            Log.d("TAG", "下載回調:" + values[0]);
+            pb.setProgress(values[0]);
+        }
+
+        @Override
+        protected void onPostExecute(Boolean aBoolean) {
+            super.onPostExecute(aBoolean);
+            if (aBoolean) {
+                Log.d("TAG", "下載成功");
+                pb.setVisibility(View.GONE);
+            } else {
+                Log.d("TAG","下載失敗");
+            }
+        }
+    }
+
+
+    class TestAsync extends AsyncTask<Void, Void, String> {
+
+        //當前還在主線程當中,做一些準備工作
+        @Override
+        protected void onPreExecute() {
+            super.onPreExecute();
+            Log.d("TAG", "onPreExecute");
+        }
+        //在異步線成立面執行
+        @Override
+        protected String doInBackground(Void... voids) {
+
+            try {
+                Thread.sleep(2 * 1000);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            String string = "123ABC456";
+            //通知主線程當前的進度是多少
+//            publishProgress(10);
+            return string;
+        }
+        //當前切換到主線程, 可以根據傳遞的參數做UI的更新
+        @Override
+        protected void onProgressUpdate(Void... values) {
+            super.onProgressUpdate(values);
+            Log.d("TAG","onProgressUpdate");
+        }
+
+        // 切換到主線程裡面執行
+        @Override
+        protected void onPostExecute(String s) {
+            super.onPostExecute(s);
+            Log.d("TAG", "onPostExecute");
+            btn.setText(s);
+        }
+    }
+
+
+
+
+    public void testPost() {
+//        handler.post(new Runnable() {
+//            @Override
+//            public void run() {
+//                Log.d("TAG", "handler post");
+//            }
+//        });
+//        handler.postDelayed(new Runnable() {
+//            @Override
+//            public void run() {
+//                Log.d("TAG", "handler post delay");
+//            }
+//        },2 *1000);
+
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    Thread.sleep(2*1000);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+//                //在非UI線程裡面更新UI控件
+//                handler.post(new Runnable() {
+//                    @Override
+//                    public void run() {
+//                        btn.setText("123ABC");
+//                    }
+//                });
+//                handler.postDelayed(new Runnable() {
+//                    @Override
+//                    public void run() {
+//                        btn.setText("234ABC");
+//                    }
+//                }, 2 * 1000);
+//                btn.post(new Runnable() {
+//                    @Override
+//                    public void run() {
+//                        btn.setText("View123");
+//                    }
+//                });
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        btn.setText("Run On UI Thread");
+                    }
+                });
+            }
+        }).start();
     }
     //1.Handler 負責收發消息 通過handler實現其他線程與主線程之間的消息傳遞
     //2.Looper 負責管理線程的消息列隊和消息循環
@@ -62,12 +219,23 @@ public class MainActivity extends AppCompatActivity {
 //                    e.printStackTrace();
 //                }
 
+                String string = "ABC123";
+
+                Message message = new Message();
+                message.what = 2;
+                message.obj = string;
+
+                handler.sendMessageDelayed(message,5 *1000);
                 handler.sendEmptyMessageDelayed(1,1*1000);
-                handler.sendEmptyMessageDelayed(2, 5*1000);
-                handler.sendEmptyMessageDelayed(3, 10*1000);
+//                handler.sendEmptyMessageDelayed(2, 5*1000);
+//                handler.sendEmptyMessageDelayed(3, 10*1000);
 
             }
         }).start();
+    }
+    public void testTimer() {
+        pb.setVisibility(View.VISIBLE);
+        handler.sendEmptyMessageDelayed(3, 2 * 1000);
     }
     //緩存線程池
     public void testCache() {
